@@ -5,26 +5,28 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
-use App\Interfaces\ProductRepositoryInterface;
 use App\Classes\ApiResponseClass;
+use App\DTOs\CreateProductDTO;
+use App\DTOs\UpdateProductDTO;
 use App\Http\Resources\ProductResource;
+use App\Services\ProductService;
 use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
 
-    private ProductRepositoryInterface $productRepositoryInterface;
+    private ProductService $productService;
 
-    public function __construct(ProductRepositoryInterface $productRepositoryInterface)
+    public function __construct(ProductService $productService)
     {
-        $this->productRepositoryInterface = $productRepositoryInterface;
+        $this->productService = $productService;
     }
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
-        $data = $this->productRepositoryInterface->index();
+        $data = $this->productService->index();
 
         return ApiResponseClass::sendResponse(ProductResource::collection($data), '', 200);
     }
@@ -42,15 +44,10 @@ class ProductController extends Controller
      */
     public function store(StoreProductRequest $request)
     {
-        $details = [
-            'name' => $request->name,
-            'details' => $request->details
-        ];
-        DB::beginTransaction();
         try {
-            $product = $this->productRepositoryInterface->store($details);
-
-            DB::commit();
+            $product = $this->productService->createProduct(
+                data: CreateProductDTO::fromRequest($request)
+            );
             return ApiResponseClass::sendResponse(new ProductResource($product), 'Product Create Successful', 201);
         } catch (\Exception $ex) {
             return ApiResponseClass::rollback($ex);
@@ -62,7 +59,7 @@ class ProductController extends Controller
      */
     public function show($id)
     {
-        $product = $this->productRepositoryInterface->getById($id);
+        $product = $this->productService->getById($id);
 
         return ApiResponseClass::sendResponse(new ProductResource($product), '', 200);
     }
@@ -80,15 +77,12 @@ class ProductController extends Controller
      */
     public function update(UpdateProductRequest $request, $id)
     {
-        $updateDetails = [
-            'name' => $request->name,
-            'details' => $request->details
-        ];
-        DB::beginTransaction();
         try {
-            $product = $this->productRepositoryInterface->update($updateDetails, $id);
+            $product = $this->productService->updateProduct(
+                data: UpdateProductDTO::fromRequest($request),
+                id: $id
+            );
 
-            DB::commit();
             return ApiResponseClass::sendResponse('Product Update Successful', '', 201);
         } catch (\Exception $ex) {
             return ApiResponseClass::rollback($ex);
@@ -100,7 +94,7 @@ class ProductController extends Controller
      */
     public function destroy($id)
     {
-        $this->productRepositoryInterface->delete($id);
+        $this->productService->deleteProduct($id);
 
         return ApiResponseClass::sendResponse('Product Delete Successful', '', 204);
     }
